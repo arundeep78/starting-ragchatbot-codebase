@@ -77,8 +77,14 @@ Provide only the direct answer to what was asked.
             api_params["tool_choice"] = {"type": "auto"}
         
         # Get response from Claude
-        response = self.client.messages.create(**api_params)
         
+        try:
+            response = self.client.messages.create(**api_params)
+        except Exception as e:
+            print("API call failed with exception:", e)
+            print("API parameters:", api_params)
+            raise
+
         # Handle tool execution if needed
         if response.stop_reason == "tool_use" and tool_manager:
             return self._handle_tool_execution(response, api_params, tool_manager)

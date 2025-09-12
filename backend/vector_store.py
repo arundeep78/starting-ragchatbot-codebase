@@ -3,7 +3,6 @@ from chromadb.config import Settings
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from models import Course, CourseChunk
-from sentence_transformers import SentenceTransformer
 
 @dataclass
 class SearchResults:
@@ -158,6 +157,7 @@ class VectorStore:
             }],
             ids=[course.title]
         )
+        print(f"Added course metadata for : '{course.title}'")
     
     def add_course_content(self, chunks: List[CourseChunk]):
         """Add course content chunks to the vector store"""
