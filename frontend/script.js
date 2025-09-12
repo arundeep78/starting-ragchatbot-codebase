@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendButton = document.getElementById('sendButton');
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
+    newChatButton = document.getElementById('newChatButton');
     
     setupEventListeners();
     createNewSession();
@@ -28,6 +29,9 @@ function setupEventListeners() {
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
     });
+    
+    // New chat functionality
+    newChatButton.addEventListener('click', startNewChat);
     
     
     // Suggested questions
@@ -122,10 +126,25 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     let html = `<div class="message-content">${displayContent}</div>`;
     
     if (sources && sources.length > 0) {
+        // Format sources - handle both old string format and new object format with links
+        const formattedSources = sources.map(source => {
+            if (typeof source === 'object' && source.text) {
+                // New format with optional link
+                if (source.link) {
+                    return `<a href="${source.link}" target="_blank" rel="noopener noreferrer" class="source-link">${source.text}</a>`;
+                } else {
+                    return source.text;
+                }
+            } else {
+                // Old string format (fallback)
+                return String(source);
+            }
+        });
+        
         html += `
             <details class="sources-collapsible">
                 <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
+                <div class="sources-content">${formattedSources.join(', ')}</div>
             </details>
         `;
     }
@@ -150,6 +169,47 @@ async function createNewSession() {
     currentSessionId = null;
     chatMessages.innerHTML = '';
     addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+}
+
+async function startNewChat() {
+    try {
+        // Disable the button to prevent multiple clicks
+        newChatButton.disabled = true;
+        newChatButton.textContent = 'STARTING...';
+        
+        const response = await fetch(`${API_URL}/new-chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                current_session_id: currentSessionId
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to start new chat');
+
+        const data = await response.json();
+        
+        // Update session ID
+        currentSessionId = data.session_id;
+        
+        // Clear chat messages and show welcome message
+        chatMessages.innerHTML = '';
+        addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+        
+        // Clear input field
+        chatInput.value = '';
+        chatInput.focus();
+        
+    } catch (error) {
+        console.error('Error starting new chat:', error);
+        addMessage(`Error starting new chat: ${error.message}`, 'assistant');
+    } finally {
+        // Re-enable button
+        newChatButton.disabled = false;
+        newChatButton.textContent = '+ NEW CHAT';
+    }
 }
 
 // Load course statistics
