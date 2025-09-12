@@ -1,0 +1,72 @@
+%% Query Flow Sequence Diagram for Course Materials RAG System
+%% This diagram illustrates the end-to-end lifecycle of a user query.
+%% Title: User Query Flow - Course Materials RAG System
+
+sequenceDiagram
+    autonumber
+    %% Frontend actors
+    box rgb(30,60,90) Frontend
+        participant U as User
+        participant FE as Browser SPA (script.js)
+    end
+    %% API layer
+    box rgb(50,50,50) API Layer
+        participant API as FastAPI /api/query
+    end
+    %% Orchestration core
+    box rgb(40,40,70) Orchestration
+        participant RAG as RAGSystem
+        participant SM as SessionManager
+        participant TM as ToolManager
+    end
+    %% AI & Tooling
+    box rgb(60,40,40) Intelligence
+        participant AI as AIGenerator (Claude)
+        participant CST as CourseSearchTool
+    end
+    %% Retrieval subsystem
+    box rgb(30,30,30) Retrieval
+        participant VS as VectorStore (ChromaDB)
+    end
+
+    Note over U,FE: User composes a natural language question
+
+    U->>FE: Enter question & submit
+    FE->>FE: sendMessage()\nDisable input + show loading
+    FE->>API: POST /api/query {query, session_id?}
+
+    API->>RAG: query(query, session_id)
+    RAG->>SM: get_conversation_history(session_id)
+    SM-->>RAG: prior exchanges (if any)
+    RAG->>AI: generate_response(prompt + tools + history)
+
+    alt Retrieval needed
+        AI-->>TM: tool_use(search_course_content)
+        TM->>CST: execute(query, course_name?, lesson_number?)
+        CST->>VS: search(filter?)
+        VS-->>CST: SearchResults (chunks + metadata)
+        CST-->>TM: formatted results + sources
+        TM-->>AI: tool_result(content)
+        AI->>AI: Second pass synthesis
+    else Direct answer (no retrieval)
+        AI-->>RAG: Answer without retrieval
+    end
+
+    AI-->>RAG: Final answer text
+    RAG->>TM: get_last_sources()
+    TM-->>RAG: sources[] (may be empty)
+    RAG->>TM: reset_sources()
+    RAG->>SM: add_exchange(user_q, answer)
+    RAG-->>API: (answer, sources)
+    API-->>FE: JSON {answer, sources, session_id}
+    FE->>FE: Render answer + sources (collapsible)
+    FE-->>U: Display response
+
+    Note over VS,CST: VectorStore uses two collections
+    Note over VS,CST: course_catalog & course_content
+
+    rect rgba(120,120,20,0.15)
+        Note over AI,VS: Retrieval branch executes at most once per query
+    end
+
+    Note over FE,API: Empty sources => direct answer path

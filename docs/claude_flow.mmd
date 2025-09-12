@@ -1,0 +1,81 @@
+graph TD
+    %% Frontend Layer
+    A["🌐 User Input<br/>JavaScript Frontend"] --> B["📤 HTTP POST /api/query<br/>{query, session_id}"]
+    
+    %% Backend Entry Point
+    B --> C["🚀 FastAPI Route<br/>@app.post('/api/query')"]
+    C --> D{"Session Exists?"}
+    D -->|No| E["🆕 Create Session"]
+    D -->|Yes| F["📋 RAG System Query"]
+    E --> F
+    
+    %% RAG System Core
+    F --> G["📜 Get Conversation History<br/>Session Manager"]
+    F --> H["🤖 AI Generator<br/>Build Prompt + Tools"]
+    
+    %% AI Processing
+    H --> I["🧠 Claude API Call<br/>System Prompt + Tools"]
+    I --> J{"Tool Use Needed?"}
+    
+    %% Tool Decision Branch
+    J -->|No| K["💬 Direct Response"]
+    J -->|Yes| L["🔧 Tool Manager<br/>Execute search_course_content"]
+    
+    %% Search Flow
+    L --> M["🔍 Course Search Tool<br/>Parse Parameters"]
+    M --> N["🗄️ Vector Store<br/>ChromaDB Similarity Search"]
+    N --> O["📊 Document Store<br/>Course Chunks + Metadata"]
+    
+    %% Results Flow
+    O --> P["📋 Search Results<br/>Format with Context"]
+    P --> Q["🔄 Back to Claude<br/>Tool Results"]
+    Q --> R["✨ Final AI Response<br/>Synthesized Answer"]
+    
+    %% Response Assembly
+    K --> S["📦 Prepare Response"]
+    R --> S
+    S --> T["📝 Track Sources<br/>Session History Update"]
+    T --> U["📤 JSON Response<br/>{answer, sources, session_id}"]
+    
+    %% Frontend Display
+    U --> V["🖥️ Frontend Display<br/>Show Answer + Sources"]
+    
+    %% Styling
+    classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef api fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef rag fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef ai fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef tools fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef data fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+    classDef decision fill:#fff8e1,stroke:#ffa000,stroke-width:2px
+    
+    class A,B,V frontend
+    class C,D,E api
+    class F,G,S,T,U rag
+    class H,I,K,R ai
+    class J decision
+    class L,M,P,Q tools
+    class N,O data
+    
+    %% Subgraph for Tool Flow Detail
+    subgraph "🔍 Search Tool Detail"
+        M1[Parse query, course_name, lesson_number]
+        M2[Filter by course/lesson if specified]
+        M3[Semantic similarity search]
+        M4[Format results with context headers]
+        M5[Track sources for UI display]
+        
+        M1 --> M2 --> M3 --> M4 --> M5
+    end
+    
+    M -.-> M1
+    M5 -.-> P
+    
+    %% Key Features Annotation
+    subgraph "🎯 Key Features"
+        F1[🧠 Intelligent tool selection by Claude]
+        F2[💾 Session-based conversation context]
+        F3[🎯 Semantic search with filtering]
+        F4[📖 Source citation tracking]
+        F5[⚡ Real-time UI feedback]
+    end
