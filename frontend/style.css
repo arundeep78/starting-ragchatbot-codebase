@@ -250,15 +250,15 @@ header h1 {
 
 /* Source Link Styles */
 .source-link {
-  color: var(--primary-color);
-  text-decoration: none;
+  color: #87ceeb; /* Sky blue for better readability */
+  text-decoration: underline;
   transition: all 0.2s ease;
   border-radius: 3px;
   padding: 0.1rem 0.2rem;
 }
 
 .source-link:hover {
-  color: var(--primary-hover);
+  color: #add8e6; /* Lighter blue for hover effect */
   background: rgba(37, 99, 235, 0.1);
   text-decoration: underline;
 }
@@ -331,6 +331,15 @@ header h1 {
   padding-left: 1rem;
   margin: 0.5rem 0;
   color: var(--text-secondary);
+}
+
+.message-content a {
+  color: #87ceeb; /* Sky blue for better readability */
+  text-decoration: underline;
+}
+
+.message-content a:hover {
+  color: #add8e6; /* Lighter blue for hover effect */
 }
 
 /* Welcome message special styling */
