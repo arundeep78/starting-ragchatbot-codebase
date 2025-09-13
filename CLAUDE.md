@@ -15,11 +15,27 @@ cd backend && uv run uvicorn app:app --reload --port 8000
 
 ### Development Setup
 ```bash
-# Install dependencies
-uv sync
+# Install dependencies (runtime + development)
+uv sync --group dev
 
 # Set environment variables
 # Create .env file with: ANTHROPIC_API_KEY=your_key_here
+```
+
+### Code Quality Workflow
+```bash
+# Format code with Black and isort
+./scripts/format.sh
+
+# Run all quality checks (format, lint, type check, tests)
+./scripts/quality.sh
+
+# Run specific checks
+./scripts/lint.sh    # Flake8 and mypy only
+./scripts/test.sh    # Tests only
+
+# Set up pre-commit hooks (optional)
+uv run pre-commit install
 ```
 
 ### Application Access
@@ -92,9 +108,18 @@ Documents are processed through `DocumentProcessor`:
 - **Database**: ChromaDB persisted to `./chroma_db` directory
 - **Document Loading**: Course files from `docs/` folder loaded on startup
 - **Hot Reload**: FastAPI runs with `--reload` for development
+- **Code Quality**: Use `./scripts/quality.sh` before committing changes
+
+### Code Quality Standards
+- **Formatting**: Black (88 char line length)
+- **Import Sorting**: isort (Black-compatible profile)
+- **Linting**: Flake8 (extends Black configuration)
+- **Type Checking**: mypy (strict mode enabled)
+- **Testing**: pytest (run via `./scripts/test.sh`)
 
 When adding new features:
 - Extend `Tool` interface in `search_tools.py` for new search capabilities
 - Modify `DocumentProcessor` for different document formats
 - Update `Config` class for new configuration options
 - Add API endpoints in `app.py` following existing patterns
+- **Always run `./scripts/quality.sh` before committing**

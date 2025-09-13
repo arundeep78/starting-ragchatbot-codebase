@@ -1,25 +1,23 @@
-import warnings
-warnings.filterwarnings("ignore", message="resource_tracker: There appear to be.*")
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from pydantic import BaseModel
-from typing import List, Optional, Union, Dict, Any
 import os
+import warnings
+from typing import List, Optional, Union
 
 from config import config
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from rag_system import RAGSystem
+
+warnings.filterwarnings("ignore", message="resource_tracker: There appear to be.*")
 
 # Initialize FastAPI app
 app = FastAPI(title="Course Materials RAG System", root_path="")
 
 # Add trusted host middleware for proxy
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["*"]
-)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 # Enable CORS with proper settings for proxy
 app.add_middleware(
@@ -34,37 +32,53 @@ app.add_middleware(
 # Initialize RAG system
 rag_system = RAGSystem(config)
 
+
 # Pydantic models for request/response
 class QueryRequest(BaseModel):
     """Request model for course queries"""
+
     query: str
     session_id: Optional[str] = None
 
+
 class Source(BaseModel):
     """Model for a source citation"""
+
     text: str
     link: Optional[str] = None
 
+
 class QueryResponse(BaseModel):
     """Response model for course queries"""
+
     answer: str
-    sources: List[Union[str, Source]]  # Support both old string format and new Source objects
+    sources: List[
+        Union[str, Source]
+    ]  # Support both old string format and new Source objects
     session_id: str
+
 
 class CourseStats(BaseModel):
     """Response model for course statistics"""
+
     total_courses: int
     course_titles: List[str]
 
+
 class NewChatRequest(BaseModel):
     """Request model for starting a new chat"""
+
     current_session_id: Optional[str] = None
+
 
 class NewChatResponse(BaseModel):
     """Response model for new chat creation"""
+
     session_id: str
 
+
 # API Endpoints
+
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
@@ -74,30 +88,30 @@ async def query_documents(request: QueryRequest):
         session_id = request.session_id
         if not session_id:
             session_id = rag_system.session_manager.create_session()
-        
+
         print(f"Query received: {request.query} (session: {session_id})")
         # Process query using RAG system
         answer, sources = rag_system.query(request.query, session_id)
-        
+
         # Convert sources to proper format
         formatted_sources = []
         for source in sources:
-            if isinstance(source, dict) and 'text' in source:
+            if isinstance(source, dict) and "text" in source:
                 # New format with link
-                formatted_sources.append(Source(text=source['text'], link=source.get('link')))
+                formatted_sources.append(
+                    Source(text=source["text"], link=source.get("link"))
+                )
             else:
                 # Old string format (fallback)
                 formatted_sources.append(str(source))
-        
-        print(f"Query: {request.query}"
-              f"\nAnswer: {answer}")
+
+        print(f"Query: {request.query}" f"\nAnswer: {answer}")
         return QueryResponse(
-            answer=answer,
-            sources=formatted_sources,
-            session_id=session_id
+            answer=answer, sources=formatted_sources, session_id=session_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/courses", response_model=CourseStats)
 async def get_course_stats():
@@ -106,10 +120,11 @@ async def get_course_stats():
         analytics = rag_system.get_course_analytics()
         return CourseStats(
             total_courses=analytics["total_courses"],
-            course_titles=analytics["course_titles"]
+            course_titles=analytics["course_titles"],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/new-chat", response_model=NewChatResponse)
 async def start_new_chat(request: NewChatRequest):
@@ -118,15 +133,16 @@ async def start_new_chat(request: NewChatRequest):
         # Clear existing session if provided
         if request.current_session_id:
             rag_system.session_manager.clear_session(request.current_session_id)
-        
+
         # Create new session
         new_session_id = rag_system.session_manager.create_session()
-        
+
         print(f"New chat session created: {new_session_id}")
         return NewChatResponse(session_id=new_session_id)
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -135,15 +151,15 @@ async def startup_event():
     if os.path.exists(docs_path):
         print("Loading initial documents...")
         try:
-            courses, chunks = rag_system.add_course_folder(docs_path, clear_existing=False)
+            courses, chunks = rag_system.add_course_folder(
+                docs_path, clear_existing=False
+            )
             print(f"Loaded {courses} courses with {chunks} chunks")
         except Exception as e:
             print(f"Error loading documents: {e}")
 
+
 # Custom static file handler with no-cache headers for development
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import os
 
 
 class DevStaticFiles(StaticFiles):
@@ -155,7 +171,7 @@ class DevStaticFiles(StaticFiles):
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
-    
-    
+
+
 # Serve static files for the frontend
 app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")

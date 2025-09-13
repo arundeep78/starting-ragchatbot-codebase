@@ -1,22 +1,24 @@
 """
 Pytest configuration and fixtures for RAG system tests
 """
-import pytest
-import tempfile
+
 import os
 import sys
-from unittest.mock import Mock, MagicMock
-from typing import Dict, Any, List
+import tempfile
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock
+
+import pytest
 
 # Add backend directory to Python path for imports
-backend_dir = os.path.join(os.path.dirname(__file__), '..')
+backend_dir = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, backend_dir)
 
-from config import Config
-from vector_store import VectorStore, SearchResults
 from ai_generator import AIGenerator
+from config import Config
+from models import Course, CourseChunk, Lesson
 from search_tools import CourseSearchTool, ToolManager
-from models import Course, Lesson, CourseChunk
+from vector_store import SearchResults, VectorStore
 
 
 @pytest.fixture
@@ -65,10 +67,22 @@ def sample_course():
         instructor="Dr. Jane Smith",
         course_link="https://example.com/ml-course",
         lessons=[
-            Lesson(lesson_number=1, title="What is Machine Learning?", lesson_link="https://example.com/ml-course/lesson1"),
-            Lesson(lesson_number=2, title="Data Preprocessing", lesson_link="https://example.com/ml-course/lesson2"),
-            Lesson(lesson_number=3, title="Linear Regression", lesson_link="https://example.com/ml-course/lesson3")
-        ]
+            Lesson(
+                lesson_number=1,
+                title="What is Machine Learning?",
+                lesson_link="https://example.com/ml-course/lesson1",
+            ),
+            Lesson(
+                lesson_number=2,
+                title="Data Preprocessing",
+                lesson_link="https://example.com/ml-course/lesson2",
+            ),
+            Lesson(
+                lesson_number=3,
+                title="Linear Regression",
+                lesson_link="https://example.com/ml-course/lesson3",
+            ),
+        ],
     )
 
 
@@ -80,20 +94,20 @@ def sample_course_chunks(sample_course):
             content="Machine learning is a method of data analysis that automates analytical model building.",
             course_title=sample_course.title,
             lesson_number=1,
-            chunk_index=0
+            chunk_index=0,
         ),
         CourseChunk(
             content="Data preprocessing involves cleaning and preparing raw data for machine learning algorithms.",
             course_title=sample_course.title,
             lesson_number=2,
-            chunk_index=1
+            chunk_index=1,
         ),
         CourseChunk(
             content="Linear regression is a linear approach to modeling the relationship between variables.",
             course_title=sample_course.title,
             lesson_number=3,
-            chunk_index=2
-        )
+            chunk_index=2,
+        ),
     ]
 
 
@@ -103,25 +117,20 @@ def sample_search_results():
     return SearchResults(
         documents=[
             "Machine learning is a method of data analysis that automates analytical model building.",
-            "Data preprocessing involves cleaning and preparing raw data for machine learning algorithms."
+            "Data preprocessing involves cleaning and preparing raw data for machine learning algorithms.",
         ],
         metadata=[
             {"course_title": "Introduction to Machine Learning", "lesson_number": 1},
-            {"course_title": "Introduction to Machine Learning", "lesson_number": 2}
+            {"course_title": "Introduction to Machine Learning", "lesson_number": 2},
         ],
-        distances=[0.1, 0.2]
+        distances=[0.1, 0.2],
     )
 
 
 @pytest.fixture
 def empty_search_results():
     """Create empty search results for testing"""
-    return SearchResults(
-        documents=[],
-        metadata=[],
-        distances=[],
-        error=None
-    )
+    return SearchResults(documents=[], metadata=[], distances=[], error=None)
 
 
 @pytest.fixture
