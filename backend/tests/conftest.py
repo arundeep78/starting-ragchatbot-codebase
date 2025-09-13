@@ -5,8 +5,10 @@ import pytest
 import tempfile
 import os
 import sys
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 from typing import Dict, Any, List
+from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
 # Add backend directory to Python path for imports
 backend_dir = os.path.join(os.path.dirname(__file__), '..')
@@ -17,6 +19,7 @@ from vector_store import VectorStore, SearchResults
 from ai_generator import AIGenerator
 from search_tools import CourseSearchTool, ToolManager
 from models import Course, Lesson, CourseChunk
+from rag_system import RAGSystem
 
 
 @pytest.fixture
@@ -175,6 +178,156 @@ This includes handling missing values, removing outliers, and normalizing data f
 Lesson 3: Linear Regression
 Lesson Link: https://example.com/ml-course/lesson3
 
-Linear regression is a linear approach to modeling the relationship between a scalar response 
+Linear regression is a linear approach to modeling the relationship between a scalar response
 and one or more explanatory variables. It is one of the most fundamental algorithms in machine learning.
 """
+
+
+@pytest.fixture
+def mock_rag_system():
+    """Create a mock RAG system for API testing"""
+    mock_rag = Mock(spec=RAGSystem)
+    mock_rag.query.return_value = (
+        "This is a test response about machine learning.",
+        [{"text": "Sample source text", "link": "https://example.com/source"}]
+    )
+    mock_rag.get_course_analytics.return_value = {
+        "total_courses": 2,
+        "course_titles": ["Introduction to Machine Learning", "Advanced Python"]
+    }
+    mock_rag.session_manager = Mock()
+    mock_rag.session_manager.create_session.return_value = "test-session-123"
+    mock_rag.session_manager.clear_session.return_value = None
+    return mock_rag
+
+
+@pytest.fixture
+def test_app():
+    """Create a test FastAPI app without static file mounting"""
+    from fastapi import FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.middleware.trustedhost import TrustedHostMiddleware
+    from pydantic import BaseModel
+    from typing import List, Optional, Union
+
+    # Import the Pydantic models from app.py
+    class QueryRequest(BaseModel):
+        query: str
+        session_id: Optional[str] = None
+
+    class Source(BaseModel):
+        text: str
+        link: Optional[str] = None
+
+    class QueryResponse(BaseModel):
+        answer: str
+        sources: List[Union[str, Source]]
+        session_id: str
+
+    class CourseStats(BaseModel):
+        total_courses: int
+        course_titles: List[str]
+
+    class NewChatRequest(BaseModel):
+        current_session_id: Optional[str] = None
+
+    class NewChatResponse(BaseModel):
+        session_id: str
+
+    app = FastAPI(title="Course Materials RAG System - Test", root_path="")
+
+    # Add middleware
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=["*"]
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+
+    return app, QueryRequest, QueryResponse, CourseStats, NewChatRequest, NewChatResponse, Source
+
+
+@pytest.fixture
+def client_with_mock_rag(test_app, mock_rag_system):
+    """Create a test client with mocked RAG system"""
+    app, QueryRequest, QueryResponse, CourseStats, NewChatRequest, NewChatResponse, Source = test_app
+
+    # Add API endpoints with mocked RAG system
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query_documents(request: QueryRequest):
+        try:
+            session_id = request.session_id
+            if not session_id:
+                session_id = mock_rag_system.session_manager.create_session()
+
+            answer, sources = mock_rag_system.query(request.query, session_id)
+
+            formatted_sources = []
+            for source in sources:
+                if isinstance(source, dict) and 'text' in source:
+                    formatted_sources.append(Source(text=source['text'], link=source.get('link')))
+                else:
+                    formatted_sources.append(str(source))
+
+            return QueryResponse(
+                answer=answer,
+                sources=formatted_sources,
+                session_id=session_id
+            )
+        except Exception as e:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/courses", response_model=CourseStats)
+    async def get_course_stats():
+        try:
+            analytics = mock_rag_system.get_course_analytics()
+            return CourseStats(
+                total_courses=analytics["total_courses"],
+                course_titles=analytics["course_titles"]
+            )
+        except Exception as e:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/new-chat", response_model=NewChatResponse)
+    async def start_new_chat(request: NewChatRequest):
+        try:
+            if request.current_session_id:
+                mock_rag_system.session_manager.clear_session(request.current_session_id)
+
+            new_session_id = mock_rag_system.session_manager.create_session()
+            return NewChatResponse(session_id=new_session_id)
+        except Exception as e:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Add a simple root endpoint for testing
+    @app.get("/")
+    async def root():
+        return {"message": "Course Materials RAG System - Test"}
+
+    return TestClient(app)
+
+
+@pytest.fixture
+def sample_query_request():
+    """Sample query request for API testing"""
+    return {
+        "query": "What is machine learning?",
+        "session_id": "test-session-123"
+    }
+
+
+@pytest.fixture
+def sample_new_chat_request():
+    """Sample new chat request for API testing"""
+    return {
+        "current_session_id": "old-session-456"
+    }
